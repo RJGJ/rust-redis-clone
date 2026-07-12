@@ -1,4 +1,5 @@
 mod command;
+mod parser;
 mod store;
 
 use command::Command;
