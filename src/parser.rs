@@ -10,6 +10,7 @@ pub fn parse(input: &str) -> Option<Command> {
             value: (*value).into(),
         }),
         ["DEL", key] => Some(Command::Del { key: (*key).into() }),
+        ["PING"] => Some(Command::Ping),
         _ => None,
     }
 }

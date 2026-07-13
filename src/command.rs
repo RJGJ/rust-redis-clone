@@ -3,5 +3,5 @@ pub enum Command {
     Set { key: String, value: String },
     Del { key: String },
     Ping,
-    Exists { key: String },
+    // Exists { key: String },
 }
