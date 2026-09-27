@@ -4,7 +4,7 @@ mod parser;
 mod response;
 mod store;
 
-use std::io::{Read, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpListener;
 
 use executor::execute;
@@ -13,30 +13,49 @@ use store::Store;
 use crate::parser::parse;
 
 fn main() {
-    let listener = TcpListener::bind("127.0.0.1:6380").expect("Failed to bind port 6380");
+    let mut store = Store::new();
 
     println!("Redis Clone is running on 127.0.0.1:6380");
 
-    let mut store = Store::new();
-
+    let listener = TcpListener::bind("127.0.0.1:6380").expect("Failed to bind port 6380");
     for stream in listener.incoming() {
+        let mut stream = stream.expect("Connection failed");
         println!("Client connected!");
 
-        let mut stream = stream.expect("Connection failed");
+        let mut reader = BufReader::new(stream);
+        let mut line = String::new();
 
-        let mut buffer = [0; 1024];
-        let bytes_read = stream.read(&mut buffer).expect("Read failed");
-        let input = String::from_utf8_lossy(&buffer[..bytes_read]);
-        let input = input.trim();
+        loop {
+            line.clear();
 
-        if let Some(command) = parse(input) {
-            let response = execute(&mut store, command);
+            let bytes_read = reader.read_line(&mut line).expect("Read failed!");
 
-            let output = format!("{}\n\n", response);
+            // client disconnected
+            if bytes_read == 0 {
+                break;
+            }
 
-            stream.write_all(output.as_bytes()).expect("Write failed");
-        } else {
-            println!("Invalid command");
+            let input = line.trim_end_matches(&['\r', '\n'][..]);
+
+            println!("Received: {}", input);
+
+            if let Some(command) = parse(input) {
+                let response = execute(&mut store, command);
+
+                let output = format!("{}\r\n", response);
+
+                reader
+                    .get_mut()
+                    .write_all(output.as_bytes())
+                    .expect("Write failed!");
+            } else {
+                reader
+                    .get_mut()
+                    .write_all(b"ERR Invalid command\r\n")
+                    .expect("Write failed!");
+            }
+
+            println!("Client disconnected");
         }
     }
 }
