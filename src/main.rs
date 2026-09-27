@@ -4,9 +4,9 @@ mod parser;
 mod response;
 mod store;
 
+use std::io::{Read, Write};
 use std::net::TcpListener;
 
-use command::Command;
 use executor::execute;
 use store::Store;
 
@@ -22,6 +22,21 @@ fn main() {
     for stream in listener.incoming() {
         println!("Client connected!");
 
-        let _stream = stream.expect("Connection failed");
+        let mut stream = stream.expect("Connection failed");
+
+        let mut buffer = [0; 1024];
+        let bytes_read = stream.read(&mut buffer).expect("Read failed");
+        let input = String::from_utf8_lossy(&buffer[..bytes_read]);
+        let input = input.trim();
+
+        if let Some(command) = parse(input) {
+            let response = execute(&mut store, command);
+
+            let output = format!("{}\n\n", response);
+
+            stream.write_all(output.as_bytes()).expect("Write failed");
+        } else {
+            println!("Invalid command");
+        }
     }
 }
